@@ -67,6 +67,12 @@ extern void *__user_text mmap(void *va, unsigned long order);
 extern int __user_text munmap(void *va);
 extern bool __user_text syscall_mode(syscall_mode_t);
 
+#define USER_BUG()                                                                       \
+    do {                                                                                 \
+        printf("BUG in %s() at line %u\n", __func__, __LINE__);                          \
+        exit(1);                                                                         \
+    } while (true)
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* KTF_USERMODE_H */
