@@ -1,5 +1,5 @@
 /**
- * Flush+Reload tools.
+ * Flush+Reload tools. Everything is still prefixed "rb" for "reload buffer"
  *
  * Originally called rb_tools, but becuase reload buffer is not a widespread term, we can
  * call it flush+reload
@@ -29,13 +29,31 @@
 #endif
 
 #ifndef SECRET
-#define SECRET 6
+#define SECRET 5
 #endif
 
 #ifndef RB_HIST
 // arbitrary ptr
 #define RB_HIST _ptr(0xfffffff000222000)
 #endif
+
+// start measure.
+static __always_inline u64 _rdtsc(void) {
+    unsigned lo, hi;
+    asm volatile("mfence\n\t"
+                 "rdtsc\n\t"
+                 : "=d"(hi), "=a"(lo));
+    return ((u64) hi << 32) | lo;
+}
+
+// stop meassure.
+static __always_inline u64 _rdtscp(void) {
+    unsigned lo, hi;
+    asm volatile("rdtscp\n\t"
+                 "mfence\n\t"
+                 : "=d"(hi), "=a"(lo)::"ecx");
+    return ((u64) hi << 32) | lo;
+}
 
 static __always_inline void reload_range(long base, long stride, unsigned n,
                                          u64 *results) {
@@ -53,9 +71,9 @@ static __always_inline void flush_range(long start, long stride, unsigned n) {
     mb();
     for (u64 k = 0; k < n; ++k) {
         volatile void *p = (u8 *) start + k * stride;
-        asm volatile("clflushopt (%0)\n" ::"r"(p));
-        asm volatile("clflushopt (%0)\n" ::"r"(p));
+        asm volatile("clflushopt %0\n" ::"m"(*(const char *) p));
     }
+    wmb();
     rmb();
 }
 
@@ -74,6 +92,8 @@ static __always_inline __user_text void rb_print_user() {
     }
     printf("\n");
 }
+
+void rb_init();
 
 #define rb_reset()  memset(_ptr(RB_HIST), 0, RB_SLOTS * sizeof(u64))
 #define rb_flush()  flush_range(_ul(RB_PTR), RB_STRIDE, RB_SLOTS);
